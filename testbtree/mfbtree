@@ -1,0 +1,26 @@
+COMPILE=gcc -g -c
+
+btreetest: os.o util.o hash.o pager.o testbtree.o random.o btree.o
+	gcc -o btreetest util.o os.o pager.o  btree.o testbtree.o hash.o \
+	random.o
+
+util.o: util.c mndbInt.h
+	$(COMPILE)  util.c
+pager.o:pager.c pager.h slqiteInt.h os.h
+	$(COMPILE) pager.c
+
+os.o: os.c hash.h hash.c sqliteInt.h
+	$(COMPILE) os.c 
+
+hash.o :hash.c hash.h
+	$(COMPILE) hash.c
+
+testbtree.o :testbtree.c pager.h
+	$(COMPILE) testbtree.c 
+random.o:
+	$(COMPILE) random.c
+btree.o:
+	$(COMPILE) btree.c
+clean:
+	rm btreetest btree.o util.o os.o hash.o testbtree.o pager.o random.o
+

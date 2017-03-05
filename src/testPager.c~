@@ -1,0 +1,9 @@
+#include"pager.h"
+
+#include<stdio.h>
+int main(){
+  mndbpager_open(pPager, "test.db", 10);
+  
+mndbpager_get(pPager, 1.);
+}
+

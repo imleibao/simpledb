@@ -1,0 +1,22 @@
+pager: os.o util.o hash.o pager.o testPager.o random.o
+	gcc -o testPager util.o os.o pager.o testPager.o hash.o \
+	random.o
+
+util.o: util.c mndbInt.h
+	gcc -c util.c
+pager.o:pager.c pager.h mndbInt.h os.h
+	gcc -c pager.c
+
+os.o: os.c hash.h hash.c mndbInt.h
+	gcc -c os.c 
+
+hash.o :hash.c hash.h
+	gcc -c hash.c
+
+testPager.o :pager.h
+	gcc -c testPager.c 
+random.o:
+	gcc -c random.c
+
+clean:
+	rm gager util.o os.o hash.o testPager.o pager.o random.o
