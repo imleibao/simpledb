@@ -790,7 +790,7 @@ int mndbpager_overwrite(Pager *pPager, Pgno pgno, void *pData){
 ** and an error code is returned.  If the commit worked, MNDB_OK
 ** is returned.
 */
-int mndbpager_commit(Pager *pPager){
+int mndbpager_commit(Pager *pPager){//TUDO:用不到??
   int rc;
   PgHdr *pPg;
 

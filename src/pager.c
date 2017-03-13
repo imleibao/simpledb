@@ -394,7 +394,7 @@ int mndbpager_ref(void *pData){
 static int pager_write_pagelist(PgHdr *pList){
   Pager *pPager;
   int rc;
-2
+
   if(pList == 0) return MNDB_OK;
   pPager = pList->pPager;
   while(pList){
@@ -790,7 +790,7 @@ int mndbpager_overwrite(Pager *pPager, Pgno pgno, void *pData){
 ** and an error code is returned.  If the commit worked, MNDB_OK
 ** is returned.
 */
-int mndbpager_commit(Pager *pPager){
+int mndbpager_commit(Pager *pPager){//TUDO:没有事务用不到??
   int rc;
   PgHdr *pPg;
 

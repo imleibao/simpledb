@@ -28,6 +28,8 @@ typedef struct OverflowPage OverflowPage;
 #define ROUNDUP(X)  ((X+3) & ~3)
 
 struct PageOne{
+  char zMagic[MAIC_SIZE];
+  int iMagic;
   Pgno freeList;
   int nFree;
 };
@@ -69,7 +71,7 @@ struct PageHdr {
 struct CellHdr {
   Pgno leftChild; /* Child page that comes before this cell */
   u16 nKey;       /* Number of bytes in the key */
-  u16 iNext;      /* Index in MemPage.u.aDisk[] of next cell in sorted order */
+  u16 iNext;      /* Index in MemPage.u.aDisk[] 按key序的下一个cell */
   u32 nData;      /* Number of bytes of data */
 };
 
@@ -187,7 +189,7 @@ struct MemPage {
   int nFree;                     /* Number of free bytes in u.aDisk[] */
   int nCell;                     /* Number of entries on this page */
   int isOverfull;                /* Some apCell[] points outside u.aDisk[] */
-  Cell *apCell[MX_CELL+2];       /* All data entires in sorted order */
+  Cell *apCell[MX_CELL+2];       /* All data entires in sorted order 插入操作会超出page所以+2*/
 };
 
 /*
@@ -217,7 +219,7 @@ struct BtCursor {
   BtCursor *pNext, *pPrev;  /* Forms a linked list of all cursors */
   Pgno pgnoRoot;            /* The root page of this tree */
   MemPage *pPage;           /* Page that contains the entry */
-  int idx;                  /* Index of the entry in pPage->apCell[] */
+  int idx;                  /* pPage->apCell[] 里面记录（entry）的索引 */
   u8 bSkipNext;             /* mndbBtreeNext() is no-op if true */
   u8 iMatch;                /* compare result from last mndbBtreeMoveto() */
 };
@@ -232,7 +234,7 @@ struct BtCursor {
 static int cellSize(Cell *pCell){
   int n = pCell->h.nKey + pCell->h.nData;
   if( n>MX_LOCAL_PAYLOAD ){
-    n = MX_LOCAL_PAYLOAD + sizeof(Pgno);
+    n = MX_LOCAL_PAYLOAD + sizeof(Pgno);//加上溢出页的页号的空间
   }else{
     n = ROUNDUP(n);
   }
@@ -240,6 +242,9 @@ static int cellSize(Cell *pCell){
   return n;
 }
 
+/* 所有的Cell移动到页的开头，宾且所有的free space 被分配到一个
+** 巨大的FreeBlk里面作为page的结尾
+*/
 static void defragmentPage(MemPage *pPage){
   int pc, i ,n;
   FreeBlk *pFBlk;
@@ -286,6 +291,7 @@ static void defragmentPage(MemPage *pPage){
 ** calls defragementPage() to consolidate all free space before 
 ** allocating the new chunk.
 */
+//如果空间不够会调用defragmentPage.
 static int allocateSpace(MemPage *pPage, int nByte){
   FreeBlk *p;
   u16 *pIdx;
@@ -524,10 +530,10 @@ int mndbBtreeClose(Btree *pBt){
 /*
 ** Change the number of pages in the cache.
 */
- //int mndbBtreeSetCacheSize(Btree *pBt, int mxPage){
-  // mndbpager_set_cachesize(pBt->pPager, mxPage);
-  // return MNDB_OK;
-  //}
+ int mndbBtreeSetCacheSize(Btree *pBt, int mxPage){
+   //删掉 mndbpager_set_cachesize(pBt->pPager, mxPage);
+   return MNDB_OK;
+ }
 
 /*
 ** Get a reference to page1 of the database file.  This will
@@ -539,6 +545,7 @@ int mndbBtreeClose(Btree *pBt){
 ** is returned if we run out of memory.  MNDB_PROTOCOL is returned
 ** if there is a locking protocol violation.
 */
+//检查是否取到第一页
 static int lockBtree(Btree *pBt){
   int rc;
   if( pBt->page1 ) return MNDB_OK;
@@ -582,28 +589,8 @@ static int newDatabase(Btree *pBt){
 **      mndbBtreeInsert()
 **      mndbBtreeDelete()
 */
-int mndbBtreeBeginTrans(Btree *pBt){
-  int rc;
-  if( pBt->inTrans ) return MNDB_ERROR;
-  if( pBt->page1==0 ){
-    rc = lockBtree(pBt);
-    if( rc!=MNDB_OK ){
-      return rc;
-    }
-  }
-  if( !mndbpager_isreadonly(pBt->pPager) ){
-    rc = mndbpager_begin(pBt->page1);
-    if( rc!=MNDB_OK ){
-      return rc;
-    }
-    rc = mndbpager_write(pBt->page1);
-    if(rc != MNDB_OK){
-      return rc;
-    }
-    rc = newDatabase(pBt);
-  }
-  pBt->inTrans = 1;
-  return rc;
+int mndbBtreeBeginTrans(Btree *pBt){//改
+  return MNDB_OK;
 }
 
 /*
@@ -616,6 +603,7 @@ int mndbBtreeBeginTrans(Btree *pBt){
 **
 ** If there is a transaction in progress, this routine is a no-op.
 */
+//释放第一页释放读锁
 static void unlockBtreeIfUnused(Btree *pBt){
   if( pBt->inTrans==0 && pBt->pCursor==0 && pBt->page1!=0 ){
     mndbpager_unref(pBt->page1);
@@ -631,12 +619,8 @@ static void unlockBtreeIfUnused(Btree *pBt){
 ** are no active cursors, it also releases the read lock.
 */
 int mndbBtreeCommit(Btree *pBt){
-  int rc;
-  if( pBt->inTrans==0 ) return MNDB_ERROR;
-  rc = mndbpager_commit(pBt->pPager);
-  pBt->inTrans = 0;
-  unlockBtreeIfUnused(pBt);
-  return rc;
+  //改
+  return MNDB_OK;
 }
 
 
@@ -645,6 +629,7 @@ int mndbBtreeCommit(Btree *pBt){
 ** iTable.  The act of acquiring a cursor gets a read lock on 
 ** the database file.
 */
+//新建cursor会给database ,iTable 就是该BTree的rootPageNumber
 int mndbBtreeCursor(Btree *pBt, int iTable, BtCursor **ppCur){
   int rc;
   BtCursor *pCur;
@@ -736,6 +721,7 @@ static void releaseTempCursor(BtCursor *pCur){
 ** pointing to an entry (which can happen, for example, if
 ** the database is empty) then *pSize is set to 0.
 */
+//获取当前cell的key的bytes
 int mndbBtreeKeySize(BtCursor *pCur, int *pSize){
   Cell *pCell;
   MemPage *pPage;
@@ -1390,6 +1376,7 @@ static void reparentChildPages(Pager *pPager, MemPage *pPage){
 ** routine will be called soon after this routine in order to rebuild 
 ** the linked list.
 */
+//只有apCell上的cellarray才是重要的，cell
 static void dropCell(MemPage *pPage, int idx, int sz){
   int j;
   assert( idx>=0 && idx<pPage->nCell );

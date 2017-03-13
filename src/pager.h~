@@ -32,11 +32,11 @@ typedef struct Pager Pager;
 /* 
 ** Routines of pager
 */
-int mndbpager_open(Pager **ppPager, const char *zFilename, int mxPage);
+int mndbpager_open(Pager **ppPager, const char *zFilename, int mxPage, int nEx);
 void mndbpager_set_destructor(Pager *pPager, void (*Desc)(void *));
 int mndbpager_pagecount(Pager *pPager);
 int mndbpager_close(Pager *pPager);
-Pgno mndbpager_pagernumber(void *pData);
+Pgno mndbpager_pagenumber(void *pData);
 int mndbpager_ref(void *pData);
 int mndbpager_get(Pager *pPager, Pgno pgno, void **ppPage);
 void* mndbpager_lookup(Pager *pPager, Pgno pgno);
